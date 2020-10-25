@@ -1,0 +1,1 @@
+this directory holds temp file for TTS of discord bot.
