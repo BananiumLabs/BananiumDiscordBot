@@ -9,6 +9,11 @@ from google.cloud import texttospeech as tts
 from google.oauth2 import service_account
 from os import path
 
+import json
+
+with open("discord_token.json", "r") as read_file:
+    discord_credentials = json.load(read_file)['token']
+
 credentials = service_account.Credentials.from_service_account_file('musty-the-mustang-9fc08f525930.json')
 
 # Suppress noise about console usage from errors
@@ -357,7 +362,7 @@ async def on_ready():
     print('------')
 
 bot.add_cog(Music(bot))
-bot.run('MTg4Nzk3NzQyNzQ1NjQ5MTUz.V1NlmQ.n9dgwqhPRAhB1EJfbUFWd2sQrBY')
+bot.run(discord_credentials)
 
 # classTest = Music(bot)
 # classTest.text_to_wav('en-US-Wavenet-A', "This is a test clip.")
