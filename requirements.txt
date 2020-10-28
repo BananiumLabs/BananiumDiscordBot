@@ -1,0 +1,5 @@
+discord.py==1.5.1
+youtube-dl
+PyNaCl
+ffmpeg
+google-cloud-texttospeech

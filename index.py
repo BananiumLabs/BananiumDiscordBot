@@ -46,6 +46,11 @@ timer_set = False
 
 voice_type = "en-AU-Wavenet-D"
 
+timer = 0
+
+time_notifs = [60 * 10, 60 * 5, 60 * 1]
+
+
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
@@ -103,6 +108,44 @@ class TTSSource():
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    async def start_timer(self, t, ctx):
+        global timer
+        print("TIMER:", t)
+        if timer == 0:
+            timer = int(t)
+            while timer > 0:
+                if not timer_set:
+                    return
+
+                timer -= 1
+
+                if timer in time_notifs:
+                    self.play_audio(ctx, 'ringtone_cut.mp3')
+                    await asyncio.sleep(3)
+                    timer -= 3
+
+                    await self.fetch_audio(ctx, str(int((timer+5)//60)) + ' minutes remaining.')
+
+                await asyncio.sleep(1)
+        else:
+            print("attempted to start timer when timer was already running!")
+
+    async def join_current(self, ctx):
+        if ctx.voice_client is None:
+            channel = ctx.author.voice.channel
+            await channel.connect()
+    
+    async def fetch_audio(self, ctx, text):
+        audioClip = TTSSource(voice_type, text)
+        while audioClip.done is False:
+            await asyncio.sleep(1)
+        self.play_audio(ctx, audioClip.filename)
+
+
+    def play_audio(self, ctx, audioName):
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioName, **ffmpeg_options))
+        ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
     @commands.command()
     async def join(self, ctx, *, channel: discord.VoiceChannel):
@@ -191,84 +234,55 @@ class Music(commands.Cog):
             return
         
         timer_set = True
-        isDone = False
-        while isDone is False:
-            # voice_type = "en-IN-Wavenet-D"
-            await ctx.send('Work Time Set: ' + wt_str + ' minutes.')
-            await ctx.send('Break Time Set: ' + bt_str + ' minutes.')
-            audioClip = TTSSource(voice_type, "Work time set for " + wt_str + " minutes. Break time set for " + bt_str + " minutes. Starting Now")
-            while audioClip.done is False:
-                await asyncio.sleep(1)
-            
-            if ctx.voice_client is None:
-                channel = ctx.author.voice.channel
-                await channel.connect()
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
-            await asyncio.sleep(workTime * 60)  # stops for x minutes
-            
-            if not timer_set:
-                return
-            audioClip = TTSSource(voice_type, wt_str + " minutes has elapsed.")
-            while audioClip.done is False:
-                await asyncio.sleep(1)
-            
-            if ctx.voice_client is None:
-                channel = ctx.author.voice.channel
-                await channel.connect()
+        await ctx.send('Work Time Set: ' + wt_str + ' minutes.')
+        await ctx.send('Break Time Set: ' + bt_str + ' minutes.')
+        
+        await self.join_current(ctx)
+        await self.fetch_audio(ctx, "Work time set for " + wt_str + " minutes. Break time set for " + bt_str + " minutes. Starting Now")
 
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            try:
-                ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-            except Exception as e: 
-                await ctx.send("Internal error: " + str(e))
-            
-            await asyncio.sleep(5)
-            # source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            # ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-            # await asyncio.sleep(5)
-            # source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            # ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-            # await asyncio.sleep(5)
+        await self.start_timer(workTime * 60, ctx)
 
-            # start break time
-            if not timer_set:
-                return
-            audioClip = TTSSource(voice_type, bt_str + " minutes break time. Starting now")
-            while audioClip.done is False:
-                await asyncio.sleep(1)
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-            await asyncio.sleep(breakTime * 60)
+        # start break time
+        if not timer_set:
+            return
 
-            # end break time
-            if not timer_set:
-                return
-            audioClip = TTSSource(voice_type, bt_str + " minutes break time has ended. Get back to work!")
-            while audioClip.done is False:
-                await asyncio.sleep(1)
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-
-            # check if keep going
-            await asyncio.sleep(5)
-            audioClip = TTSSource(voice_type, "Want to go for another round of oxford university? Please type yes in bots channel to confirm.")
-            while audioClip.done is False:
-                await asyncio.sleep(1)
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-            ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
-
-            isDone = True
+        await self.join_current(ctx)
+        self.play_audio(ctx, 'oth_clip.mp3')
+        await asyncio.sleep(28)
+        await self.fetch_audio(ctx, bt_str + " minutes break time is starting now!")
+        await self.start_timer(max(0.2*60, breakTime*60), ctx)
+        self.play_audio(ctx, 'ringtone_cut.mp3')
+        await asyncio.sleep(3)
+        await self.fetch_audio(ctx, bt_str + " minutes break time has ended. Get back to work!")
 
         # check if keep going
-        await asyncio.sleep(10)
-        audioClip = TTSSource(voice_type, "Oxford university session terminated.")
-        while audioClip.done is False:
-            await asyncio.sleep(1)
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
-        ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
+        # await asyncio.sleep(5)
+        # audioClip = TTSSource(voice_type, "Want to go for another round of oxford university? Please type yes in bots channel to confirm.")
+        # while audioClip.done is False:
+        #     await asyncio.sleep(1)
+        # source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
+        # ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
+
+        # isDone = True
+
+        # # check if keep going
+        # await asyncio.sleep(10)
+        # audioClip = TTSSource(voice_type, "Oxford university session terminated.")
+        # while audioClip.done is False:
+        #     await asyncio.sleep(1)
+        # source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
+        # ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
         timer_set = False
+
+    @commands.command()
+    async def time(self, ctx):
+        if timer > 0:
+            minutes = timer // 60
+            seconds = timer % 60 if timer % 60 > 9 else '0' + str(timer % 60)
+            await ctx.send("Time remaining: " + str(minutes) + ":" + str(seconds))
+        else:
+            await ctx.send("No timer active.")
 
     @commands.command()
     async def pom_cancel(self, ctx):
