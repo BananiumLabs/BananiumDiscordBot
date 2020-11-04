@@ -48,8 +48,27 @@ voice_type = "en-AU-Wavenet-D"
 
 timer = 0
 
-time_notifs = [60 * 10, 60 * 5, 60 * 1]
+time_notifs = [60 * 10, 60 * 5]
 
+time_msg = None
+
+colors = {'work': 0xffd52b, 'break': 0x49b800, 'general': 0x33ccff, 'error': 0xff6f5c}
+
+
+async def send_msg(ctx, title: str, message: str, color='general'):
+    embed = discord.Embed(color=colors[color])
+    embed.add_field(name=title, value=message, inline=False)
+    await ctx.send(embed=embed)
+
+def make_time_embed(type):
+    embed = discord.Embed(color=colors[type])
+    embed.add_field(name="⌛ " + type.capitalize() + " Time Remaining:", value=get_formatted_time(timer))
+    return embed
+
+def get_formatted_time(time: int):
+    minutes = timer // 60
+    seconds = timer % 60 if timer % 60 > 9 else '0' + str(timer % 60)
+    return str(minutes) + ":" + str(seconds)
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -109,7 +128,7 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def start_timer(self, t, ctx):
+    async def start_timer(self, t, ctx, type):
         global timer
         print("TIMER:", t)
         if timer == 0:
@@ -119,6 +138,8 @@ class Music(commands.Cog):
                     return
 
                 timer -= 1
+                if time_msg:
+                    await time_msg.edit(embed=make_time_embed(type))
 
                 if timer in time_notifs:
                     self.play_audio(ctx, 'ringtone_cut.mp3')
@@ -176,7 +197,7 @@ class Music(commands.Cog):
     async def play(self, ctx, *, query):
         """Plays a file from the local filesystem"""
 
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(query, **ffmpeg_options))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio("local_mp3/" + query, **ffmpeg_options))
         ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
         await ctx.send('Now playing: {}'.format(query))
@@ -222,6 +243,7 @@ class Music(commands.Cog):
     async def pom(self, ctx, workTime: float, breakTime: float):
         global timer_set
         global voice_type
+        global time_msg
 
         bt_str = str(int(breakTime) if int(breakTime) == breakTime else breakTime)
         wt_str = str(int(workTime) if int(workTime) == workTime else workTime)
@@ -230,18 +252,18 @@ class Music(commands.Cog):
             return
 
         if timer_set:
-            await ctx.send("Timer is already active. !pom_cancel to kill.")
+            await ctx.send("Timer is already active. !cancel to kill.")
             return
         
         timer_set = True
 
-        await ctx.send('Work Time Set: ' + wt_str + ' minutes.')
-        await ctx.send('Break Time Set: ' + bt_str + ' minutes.')
+        await send_msg(ctx, 'Timer Set', 'Work Time Set: ' + wt_str + ' minutes.\nBreak Time Set: ' + bt_str + ' minutes.')
+        time_msg = await ctx.send(embed=make_time_embed('work'))
         
         await self.join_current(ctx)
         await self.fetch_audio(ctx, "Work time set for " + wt_str + " minutes. Break time set for " + bt_str + " minutes. Starting Now")
 
-        await self.start_timer(workTime * 60, ctx)
+        await self.start_timer(workTime * 60, ctx, 'work')
 
         # start break time
         if not timer_set:
@@ -251,10 +273,12 @@ class Music(commands.Cog):
         self.play_audio(ctx, 'oth_clip.mp3')
         await asyncio.sleep(28)
         await self.fetch_audio(ctx, bt_str + " minutes break time is starting now!")
-        await self.start_timer(max(0.2*60, breakTime*60), ctx)
+        await self.start_timer(max(0.2*60, breakTime*60), ctx, 'break')
         self.play_audio(ctx, 'ringtone_cut.mp3')
         await asyncio.sleep(3)
         await self.fetch_audio(ctx, bt_str + " minutes break time has ended. Get back to work!")
+        if time_msg:
+                await time_msg.delete()
 
         # check if keep going
         # await asyncio.sleep(5)
@@ -275,27 +299,35 @@ class Music(commands.Cog):
         # ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
         timer_set = False
 
-    @commands.command()
+    @commands.command(pass_context=True)
     async def time(self, ctx):
+        global time_msg
         if timer > 0:
+            if time_msg:
+                await time_msg.delete()
+                time_msg = None
             minutes = timer // 60
             seconds = timer % 60 if timer % 60 > 9 else '0' + str(timer % 60)
-            await ctx.send("Time remaining: " + str(minutes) + ":" + str(seconds))
+            time_msg = await ctx.send(embed=make_time_embed('work'))
         else:
-            await ctx.send("No timer active.")
+            # await ctx.send("No timer active.")
+            await send_msg(ctx, "❌", "No Timer Active", color='error')
+        await ctx.message.delete()
 
     @commands.command()
-    async def pom_cancel(self, ctx):
+    async def cancel(self, ctx):
         global timer_set
 
         if timer_set:
-            await ctx.send("Timer killed.")
+            await send_msg(ctx, "❌", "Timer Killed", color='error')
             timer_set = False
+            if time_msg:
+                await time_msg.delete()
         else:
-            await ctx.send("No timer is active yet")
+            await send_msg(ctx, "❌", "No Timer Active", color='error')
 
     @commands.command()
-    async def pom_voice(self, ctx, voice: str):
+    async def voice(self, ctx, voice: str):
         global voice_type
 
         voice_dict = {
@@ -321,15 +353,17 @@ class Music(commands.Cog):
 
     @commands.command()
     async def voicelist(self, ctx):
-        await ctx.send(r"""
-        ```
-    AU_M: Australian Male
-    AU_F: Australian Female
-    IN_M: Indian Male
-    IN_F: Indian Female
-    US_M: Standard Male
-    US_F: Standard Female
-        ```
+        await send_msg(ctx, 'Voice List', r"""
+    
+    **AU_M:** Australian Male
+    **AU_F:** Australian Female
+    **IN_M:** Indian Male
+    **IN_F:** Indian Female
+    **US_M:** Standard Male
+    **US_F:** Standard Female
+    **GB_M:** British Male
+    **GB_F:** British Female
+    
         """)
 
     @commands.command()
