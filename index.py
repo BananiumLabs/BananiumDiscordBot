@@ -165,7 +165,7 @@ class Music(commands.Cog):
 
 
     def play_audio(self, ctx, audioName):
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioName, **ffmpeg_options))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio('local_mp3/' + audioName, **ffmpeg_options))
         ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
     @commands.command()
