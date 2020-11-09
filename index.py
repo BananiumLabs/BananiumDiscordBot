@@ -169,7 +169,7 @@ class Music(commands.Cog):
 
 
     def play_audio(self, ctx, audioName):
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio('local_mp3/' + audioName, **ffmpeg_options))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioName, **ffmpeg_options))
         ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
     @commands.command()
@@ -274,6 +274,7 @@ class Music(commands.Cog):
             return
 
         await self.join_current(ctx)
+        await ctx.send("-pause")
         self.play_audio(ctx, 'local_mp3/oth_clip.mp3')
         await asyncio.sleep(28)
         await self.fetch_audio(ctx, bt_str + " minutes break time is starting now!")
