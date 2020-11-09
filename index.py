@@ -139,10 +139,14 @@ class Music(commands.Cog):
 
                 timer -= 1
                 if time_msg:
-                    await time_msg.edit(embed=make_time_embed(type))
+                    try:
+                        await time_msg.edit(embed=make_time_embed(type))
+                    except:
+                        pass
+                    
 
                 if timer in time_notifs:
-                    self.play_audio(ctx, 'ringtone_cut.mp3')
+                    self.play_audio(ctx, 'local_mp3/ringtone_cut.mp3')
                     await asyncio.sleep(3)
                     timer -= 3
 
@@ -270,11 +274,11 @@ class Music(commands.Cog):
             return
 
         await self.join_current(ctx)
-        self.play_audio(ctx, 'oth_clip.mp3')
+        self.play_audio(ctx, 'local_mp3/oth_clip.mp3')
         await asyncio.sleep(28)
         await self.fetch_audio(ctx, bt_str + " minutes break time is starting now!")
         await self.start_timer(max(0.2*60, breakTime*60), ctx, 'break')
-        self.play_audio(ctx, 'ringtone_cut.mp3')
+        self.play_audio(ctx, 'local_mp3/ringtone_cut.mp3')
         await asyncio.sleep(3)
         await self.fetch_audio(ctx, bt_str + " minutes break time has ended. Get back to work!")
         if time_msg:
