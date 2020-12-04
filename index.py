@@ -1,3 +1,5 @@
+import os
+import sys
 import asyncio
 
 import discord
@@ -324,6 +326,12 @@ class Music(commands.Cog):
         global timer_set
 
         if timer_set:
+            # Ben I know this is super hacky, but im just going to put this here until we have time to get this
+            # fixed. >
+            await send_msg(ctx, "❌", "Please wait. Restarting script...", color='error')
+            os.execl(sys.executable, sys.executable, *sys.argv)
+            return
+
             await send_msg(ctx, "❌", "Timer Killed", color='error')
             timer_set = False
             if time_msg:
@@ -413,6 +421,7 @@ bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
 async def on_ready():
     print('Logged in as {0} ({0.id})'.format(bot.user))
     print('------')
+    await bot.get_channel(751662103483383838).send('Logged in as {0} ({0.id})'.format(bot.user))
 
 bot.add_cog(Music(bot))
 bot.run(discord_credentials)
