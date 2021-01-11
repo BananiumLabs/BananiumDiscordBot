@@ -62,6 +62,11 @@ async def send_msg(ctx, title: str, message: str, color='general'):
     embed.add_field(name=title, value=message, inline=False)
     await ctx.send(embed=embed)
 
+async def send_msg_inline(ctx, title: str, message: str, color='general'):
+    embed = discord.Embed(color=colors[color])
+    embed.add_field(name=title, value=message, inline=True)
+    await ctx.send(embed=embed)
+
 def make_time_embed(type):
     embed = discord.Embed(color=colors[type])
     embed.add_field(name="⌛ " + type.capitalize() + " Time Remaining:", value=get_formatted_time(timer))
@@ -390,6 +395,10 @@ class Music(commands.Cog):
             ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
         else:
             await ctx.send("Input string for TTS is too long. Please try again with a shorter string.")
+
+    @commands.command()
+    async def echo(self, ctx, *inStr):
+        await send_msg_inline(ctx, inStr[0], inStr[1], color='general')
          
     @commands.command()
     async def joinForce(self, ctx):
