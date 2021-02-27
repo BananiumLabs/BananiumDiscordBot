@@ -446,6 +446,25 @@ class Bananium(commands.Cog):
         """Leave voice channel and force bypass restrictions."""
         await ctx.voice_client.disconnect()
 
+    @commands.command(pass_context=True)
+    async def omar(self, ctx, user):
+        """Be Omar. Pass in a user as parameter."""
+        user = user.replace("<","").replace(">","").replace("@","").replace("!","")
+        print(user)
+        user_member = await ctx.guild.fetch_member(user)
+        if user_member is not None:
+            kick_channel = await ctx.guild.create_voice_channel("kicked")
+            await user_member.move_to(kick_channel, reason="you have been kicked by Omar.")
+            await kick_channel.delete()
+        else:
+            print("user invalid for omar()")
+
+    @commands.command()
+    async def purge(self, ctx, count: int):
+        """Purges the past x number of messages."""
+        await ctx.channel.purge(limit=count+1)
+
+
     @play.before_invoke
     @yt.before_invoke
     @stream.before_invoke
