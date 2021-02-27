@@ -35,6 +35,8 @@ ytdl_format_options = {
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+    # 'cookies': 'cookies.txt.json',
+    # 'force_generic_extractor': True
 }
 
 ffmpeg_options = {
@@ -102,8 +104,9 @@ class TTSSource():
     def __init__(self, voice_name, text):
         self.done = False
         language_code = '-'.join(voice_name.split('-')[:2])
-
-        filename = f'audio/{language_code}_{voice_name}_{text}.wav'
+        
+        encryptedText = self.encryptDecrypt(text)
+        filename = f'audio/{language_code}_{voice_name}_{encryptedText}.wav'
         
         # check if audio already cached
         if path.exists(filename):
@@ -131,7 +134,26 @@ class TTSSource():
                 self.filename = filename
                 self.done = True
 
-class Music(commands.Cog):
+    def encryptDecrypt(self, inpString): 
+        # Define XOR key 
+        # Any character value will work 
+        xorKey = 'P'; 
+    
+        # calculate length of input string 
+        length = len(inpString); 
+    
+        # perform XOR operation of key 
+        # with every caracter in string 
+        for i in range(length): 
+        
+            inpString = (inpString[:i] + 
+                chr(ord(inpString[i]) ^ ord(xorKey)) +
+                        inpString[i + 1:]); 
+            print(inpString[i], end = ""); 
+        
+        return inpString; 
+
+class Bananium(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -190,7 +212,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def color(self, ctx, roleIn, color):
-        """Joins a voice channel"""
+        """changes color for a role"""
         print("Login as")
         print(self.bot.user)
         print("-------")
@@ -208,7 +230,7 @@ class Music(commands.Cog):
     async def play(self, ctx, *, query):
         """Plays a file from the local filesystem"""
 
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio("local_mp3/" + query, **ffmpeg_options))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio("local_mp3/" + query + ".mp3", **ffmpeg_options))
         ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
         await ctx.send('Now playing: {}'.format(query))
@@ -232,7 +254,7 @@ class Music(commands.Cog):
             ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
         await ctx.send('Now playing: {}'.format(player.title))
-        await ctx.send('WARN: stream() may abruptly stop if HTTP connection times out. To avoid this issue, use yt() instead to download the full audio prior to playback.')
+        await ctx.send('Note: If stream abruptly stop, try using yt() fallback command to download the full audio prior to playback. This will result in excessive buffering time.')
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -252,6 +274,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def pom(self, ctx, workTime: float, breakTime: float):
+        """Initiates Pomodoro Timer"""
         global timer_set
         global voice_type
         global time_msg
@@ -313,6 +336,7 @@ class Music(commands.Cog):
 
     @commands.command(pass_context=True)
     async def time(self, ctx):
+        """Prints Pomodoro time remaining"""
         global time_msg
         if timer > 0:
             if time_msg:
@@ -328,6 +352,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def cancel(self, ctx):
+        """Cancel Pomodoro Timer"""
         global timer_set
 
         if timer_set:
@@ -346,6 +371,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def voice(self, ctx, voice: str):
+        """Set Speech API voice type"""
         global voice_type
 
         voice_dict = {
@@ -371,6 +397,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def voicelist(self, ctx):
+        """Lists example Google Speech API voice codes"""
         await send_msg(ctx, 'Voice List', r"""
     
     **AU_M:** Australian Male
@@ -383,31 +410,40 @@ class Music(commands.Cog):
     **GB_F:** British Female
     
         """)
-
+    
+    
     @commands.command()
+    
     async def tts(self, ctx, *inStr):
+        """TTS on voice channel using Google Natural Speech API"""
         global voice_type
-        if (len(inStr) < 100):
+        if (len(inStr) < 100):            
             audioClip = TTSSource(voice_type, " ".join(inStr))
             while audioClip.done is False:
                 await asyncio.sleep(1)
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
+            if ctx.voice_client is None:
+                channel = ctx.author.voice.channel
+                await channel.connect()
             ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
         else:
             await ctx.send("Input string for TTS is too long. Please try again with a shorter string.")
 
     @commands.command()
     async def echo(self, ctx, *inStr):
+        """Prints input inline message"""
         await send_msg_inline(ctx, inStr[0], inStr[1], color='general')
          
     @commands.command()
     async def joinForce(self, ctx):
+        """Join voice channel and force bypass restrictions."""
         print("joining")
         channel = ctx.author.voice.channel
         await channel.connect()
 
     @commands.command()
     async def leaveForce(self, ctx):
+        """Leave voice channel and force bypass restrictions."""
         await ctx.voice_client.disconnect()
 
     @play.before_invoke
@@ -424,16 +460,17 @@ class Music(commands.Cog):
             ctx.voice_client.stop()
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
-                   description='Relatively simple music bot example')
+                   description='BananiumLabs Discord Bot. Script by EnumC and 64bitpanda')
 
 @bot.event
 async def on_ready():
     print('Logged in as {0} ({0.id})'.format(bot.user))
     print('------')
     await bot.get_channel(751662103483383838).send('Logged in as {0} ({0.id})'.format(bot.user))
+    await bot.change_presence(activity=discord.Activity(name=' for !help | Coded by EnumC and 64bitpanda', type=3)) # Displays 'Watching !help'
 
-bot.add_cog(Music(bot))
+bot.add_cog(Bananium(bot))
 bot.run(discord_credentials)
 
-# classTest = Music(bot)
+# classTest = Bananium(bot)
 # classTest.text_to_wav('en-US-Wavenet-A', "This is a test clip.")
