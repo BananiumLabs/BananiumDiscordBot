@@ -106,6 +106,7 @@ class TTSSource():
         language_code = '-'.join(voice_name.split('-')[:2])
         
         encryptedText = self.encryptDecrypt(text)
+        
         filename = f'audio/{language_code}_{voice_name}_{encryptedText}.wav'
         
         # check if audio already cached
@@ -151,7 +152,7 @@ class TTSSource():
                         inpString[i + 1:]); 
             print(inpString[i], end = ""); 
         
-        return inpString; 
+        return inpString.replace("\0", ""); 
 
 class Bananium(commands.Cog):
     def __init__(self, bot):
@@ -417,8 +418,14 @@ class Bananium(commands.Cog):
     async def tts(self, ctx, *inStr):
         """TTS on voice channel using Google Natural Speech API"""
         global voice_type
-        if (len(inStr) < 100):            
-            audioClip = TTSSource(voice_type, " ".join(inStr))
+        totalChars = 0
+        for x in inStr:
+            totalChars += len(x)
+        if (totalChars < 200):
+            cleanedStr = ""
+            for x in inStr:
+                cleanedStr += x.replace("\0", "")
+            audioClip = TTSSource(voice_type, cleanedStr)
             while audioClip.done is False:
                 await asyncio.sleep(1)
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audioClip.filename, **ffmpeg_options))
