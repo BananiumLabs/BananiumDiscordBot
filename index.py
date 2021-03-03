@@ -83,22 +83,71 @@ class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
 
+        # self.requester = ctx.author
+        # self.channel = ctx.channel
         self.data = data
 
+        self.uploader = data.get('uploader')
+        self.uploader_url = data.get('uploader_url')
+        date = data.get('upload_date')
+        self.upload_date = date[6:8] + '.' + date[4:6] + '.' + date[0:4]
         self.title = data.get('title')
-        self.url = data.get('url')
+        self.thumbnail = data.get('thumbnail')
+        self.description = data.get('description')
+        self.duration = self.parse_duration(int(data.get('duration')))
+        self.tags = data.get('tags')
+        self.url = data.get('webpage_url')
+        self.views = data.get('view_count')
+        self.likes = data.get('like_count')
+        self.dislikes = data.get('dislike_count')
+        self.stream_url = data.get('url')
 
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=False):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
-        if 'entries' in data:
+        if 'entries' in data and data['entries'] is not None:
             # take first item from a playlist
+            print(data)
             data = data['entries'][0]
 
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
+
+    @staticmethod
+    def parse_duration(duration: int):
+        minutes, seconds = divmod(duration, 60)
+        hours, minutes = divmod(minutes, 60)
+        days, hours = divmod(hours, 24)
+
+        duration = []
+        if days > 0:
+            duration.append('{} days'.format(days))
+        if hours > 0:
+            duration.append('{} hours'.format(hours))
+        if minutes > 0:
+            duration.append('{} minutes'.format(minutes))
+        if seconds > 0:
+            duration.append('{} seconds'.format(seconds))
+
+        return ', '.join(duration)
+class Song:
+    def __init__(self, source: YTDLSource):
+        self.source = source
+        # self.requester = source.requester
+
+    def create_embed(self):
+        embed = (discord.Embed(title='Now playing',
+                               description='```css\n{0.source.title}\n```'.format(self),
+                               color=discord.Color.blurple())
+                 .add_field(name='Duration', value=self.source.duration)
+                #  .add_field(name='Requested by', value=self.requester.mention)
+                 .add_field(name='Uploader', value='[{0.source.uploader}]({0.source.uploader_url})'.format(self))
+                 .add_field(name='URL', value='[Click]({0.source.url})'.format(self))
+                 .set_thumbnail(url=self.source.thumbnail))
+
+        return embed
 
 class TTSSource():
     def __init__(self, voice_name, text):
@@ -228,7 +277,7 @@ class Bananium(commands.Cog):
             await ctx.send("u suck")
 
     @commands.command()
-    async def play(self, ctx, *, query):
+    async def local(self, ctx, *, query):
         """Plays a file from the local filesystem"""
 
         source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio("local_mp3/" + query + ".mp3", **ffmpeg_options))
@@ -236,26 +285,29 @@ class Bananium(commands.Cog):
 
         await ctx.send('Now playing: {}'.format(query))
 
-    @commands.command()
-    async def yt(self, ctx, *, url):
-        """Plays from a url (almost anything youtube_dl supports)"""
+    # @commands.command()
+    # async def download(self, ctx, *, url):
+    #     """Plays from a url (almost anything youtube_dl supports)"""
     
-        async with ctx.typing():
-            player = await YTDLSource.from_url(url, loop=self.bot.loop)
-            ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+    #     async with ctx.typing():
+    #         player = await YTDLSource.from_url(url, loop=self.bot.loop)
+    #         ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
-        await ctx.send('Now playing: {}'.format(player.title))
+    #     await ctx.send('Now playing: {}'.format(player.title))
+    #     await ctx.send('WARN: This command consumes significant disk space. Use play() instead whenever possible!')
 
     @commands.command()
-    async def stream(self, ctx, *, url):
+    async def play(self, ctx, *, url):
         """Streams from a url (same as yt, but doesn't predownload)"""
 
         async with ctx.typing():
             player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+            song = Song(player)
             ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
         await ctx.send('Now playing: {}'.format(player.title))
-        await ctx.send('Note: If stream abruptly stop, try using yt() fallback command to download the full audio prior to playback. This will result in excessive buffering time.')
+        await ctx.send(embed=song.create_embed())
+        # await ctx.send('Hint: If stream abruptly stop, try using download() instead.')
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -472,8 +524,8 @@ class Bananium(commands.Cog):
 
 
     @play.before_invoke
-    @yt.before_invoke
-    @stream.before_invoke
+    # @download.before_invoke
+    @local.before_invoke
     async def ensure_voice(self, ctx):
         if ctx.voice_client is None:
             if ctx.author.voice:
