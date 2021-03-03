@@ -419,12 +419,11 @@ class Bananium(commands.Cog):
         """TTS on voice channel using Google Natural Speech API"""
         global voice_type
         totalChars = 0
+        cleanedStr = ""
         for x in inStr:
-            totalChars += len(x)
+            cleanedStr += x.replace("\0", "")
+        totalChars = len(cleanedStr)
         if (totalChars < 200):
-            cleanedStr = ""
-            for x in inStr:
-                cleanedStr += x.replace("\0", "")
             audioClip = TTSSource(voice_type, cleanedStr)
             while audioClip.done is False:
                 await asyncio.sleep(1)
