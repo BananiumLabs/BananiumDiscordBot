@@ -234,15 +234,18 @@ class VoiceState:
         self._ctx = ctx
 
         self.current = None
+        self.temp = None
         self.voice = None
         self.next = asyncio.Event()
         self.songs = SongQueue()
-
+        # self.interrupts = SongQueue()
+        # self.interrupts_next = asyncio.Event()
         self._loop = False
         self._volume = 0.5
         self.skip_votes = set()
 
         self.audio_player = bot.loop.create_task(self.audio_player_task())
+        # self.audio_interrupt_player = bot.loop.create_task(self.audio_player_interrupt_task())
 
     def __del__(self):
         self.audio_player.cancel()
@@ -270,7 +273,7 @@ class VoiceState:
     async def audio_player_task(self):
         while True:
             self.next.clear()
-
+            
             if not self.loop:
                 # Try to get the next song within 3 minutes.
                 # If no song will be added to the queue in time,
@@ -288,6 +291,22 @@ class VoiceState:
             await self.current.source.channel.send(embed=self.current.create_embed())
 
             await self.next.wait()
+
+    # async def audio_player_interrupt_task(self):
+    #     while True:
+    #         self.temp = self.current
+    #         self.current = await self.interrupts.get()
+
+    #         self.current.source.volume = self._volume
+    #         self.voice.play(self.current.source, after=self.play_orig_song)
+
+    #         await self.interrupts_next.wait()
+
+    # def play_orig_song(self):
+    #     self.current = self.temp
+    #     self.current.source.volume = self._volume
+    #     self.voice.play(self.current.source, after=self.play_next_song)
+
 
     def play_next_song(self, error=None):
         if error:
@@ -748,7 +767,7 @@ class Bananium(commands.Cog):
             return
 
         await self.join_current(ctx)
-        await ctx.send("-pause")
+        # await ctx.send("!omar @akcougar#9060")
         self.play_audio(ctx, 'local_mp3/oth_clip.mp3')
         await asyncio.sleep(28)
         await self.fetch_audio(ctx, bt_str + " minutes break time is starting now!")
@@ -904,6 +923,21 @@ class Bananium(commands.Cog):
         if user_member is not None:
             kick_channel = await ctx.guild.create_voice_channel("kicked")
             await user_member.move_to(kick_channel, reason="you have been kicked by Omar.")
+            await kick_channel.delete()
+        else:
+            print("user invalid for omar()")
+
+    @commands.command(pass_context=True)
+    async def omartrifacta(self, ctx):
+        """Be Omar for three."""
+        user_member1 = await ctx.guild.fetch_member("142084729674399745")
+        user_member2 = await ctx.guild.fetch_member("197784087476305921")
+        user_member3 = await ctx.guild.fetch_member("219969018369409024")
+        if user_member1 is not None and user_member2 is not None and user_member3 is not None:
+            kick_channel = await ctx.guild.create_voice_channel("kicked")
+            await user_member1.move_to(kick_channel, reason="you have been kicked by Omar.")
+            await user_member2.move_to(kick_channel, reason="you have been kicked by Omar.")
+            await user_member3.move_to(kick_channel, reason="you have been kicked by Omar.")
             await kick_channel.delete()
         else:
             print("user invalid for omar()")
